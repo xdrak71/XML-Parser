@@ -1,34 +1,60 @@
 import java.util.Scanner;
 
 public class Main {
+    private static String activeFilePath = null;
+    private static XmlElement rootNode = null;
+
     public static void main(String[] args) {
-        Scanner scanner = new Scanner(System.in);
-        System.out.println("XML Parser started. Type 'help' for commands.");
+        Scanner sc = new Scanner(System.in);
+        System.out.println("XML Парсерът е стартиран. Напишете 'help' за списък с команди.");
 
         while (true) {
             System.out.print("> ");
-            String input = scanner.nextLine().trim();
-            if (input.isEmpty()) continue;
-            String[] parts = input.split("\\s+", 2);
-            String command = parts[0].toLowerCase();
+            String inputLine = sc.nextLine().trim();
 
-            switch (command) {
+            if (inputLine.isEmpty()) {
+                continue;
+            }
+            String[] words = inputLine.split("\\s+", 2);
+            String cmd = words[0].toLowerCase();
+            String argsStr = words.length > 1 ? words[1].trim() : "";
+
+            switch (cmd) {
+                case "open":
+                    if (!argsStr.isEmpty()) {
+                        openFile(argsStr.replace("\"", ""));
+                    } else {
+                        System.out.println("Грешка: Моля, въведете път до файла.");
+                    }
+                    break;
+                case "close":
+                    closeFile();
+                    break;
                 case "help":
                     printHelp();
                     break;
                 case "exit":
-                    System.out.println("Exiting the program...");
-                    scanner.close();
+                    System.out.println("Излизане от програмата...");
+                    sc.close();
                     return;
                 default:
-                    System.out.println("Unknown command. Type 'help'.");
+                    System.out.println("Невалидна команда. Напишете 'help'.");
             }
         }
     }
+    private static void openFile(String path) {
+        System.out.println("Извикан е метод open за файл: " + path);
+    }
+
+    private static void closeFile() {
+        System.out.println("Извикан е метод close.");
+    }
 
     private static void printHelp() {
-        System.out.println("The following commands are supported:");
-        System.out.println("help             prints this information");
-        System.out.println("exit             exits the program");
+        System.out.println("Поддържани команди:");
+        System.out.println("open <file>      - отваря <file>");
+        System.out.println("close            - затваря текущия файл");
+        System.out.println("help             - показва това меню");
+        System.out.println("exit             - спира програмата");
     }
 }
