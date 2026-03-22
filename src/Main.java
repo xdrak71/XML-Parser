@@ -43,11 +43,31 @@ public class Main {
         }
     }
     private static void openFile(String path) {
-        System.out.println("Извикан е метод open за файл: " + path);
+        try {
+            File file = new File(path);
+            if (file.exists()) {
+                activeFilePath = path;
+                rootNode = new XmlElement("root");
+                System.out.println("Успешно отворен файл " + path);}
+            else{
+                activeFilePath = path;
+                rootNode = new XmlElement("root");
+                rootNode.setId("0"); // Даваме му базово ID
+                System.out.println("Файлът не беше намерен. Създаден е нов празен документ в паметта.");
+            }}
+        catch (Exception e){
+            System.out.println("Възникна грешка при отварянето на файла: " + e.getMessage());
+        }
     }
 
     private static void closeFile() {
-        System.out.println("Извикан е метод close.");
+        if(activeFilePath != null) {
+            System.out.println("Успешно затворен файл "+activeFilePath);
+            activeFilePath = null;
+            rootNode = null;}
+        else{
+            System.out.println("Грешка: В момента няма отворен файл, който да бъде затворен.");
+        }
     }
 
     private static void printHelp() {
