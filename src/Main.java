@@ -46,17 +46,18 @@ public class Main {
         try {
             File file = new File(path);
             if (file.exists()) {
+                CustomXmlParser parser = new CustomXmlParser();
+                rootNode = parser.parseFile(path);
+                activeFilePath = path;
+                System.out.println("Успешно отворен и прочетен файл " + path);
+            } else {
                 activeFilePath = path;
                 rootNode = new XmlElement("root");
-                System.out.println("Успешно отворен файл " + path);}
-            else{
-                activeFilePath = path;
-                rootNode = new XmlElement("root");
-                rootNode.setId("0"); // Даваме му базово ID
-                System.out.println("Файлът не беше намерен. Създаден е нов празен документ в паметта.");
-            }}
-        catch (Exception e){
-            System.out.println("Възникна грешка при отварянето на файла: " + e.getMessage());
+                rootNode.setId("0");
+                System.out.println("Файлът не беше намерен. Създаден е нов празен документ в паметта."); [cite: 16]
+            }
+        } catch (Exception e) {
+            System.out.println("Възникна грешка при отварянето или четенето на файла: " + e.getMessage()); [cite: 20]
         }
     }
 
