@@ -56,19 +56,34 @@ public class Main {
                     break;
                 case "set":
                     String[] setArgs = argsStr.split("\\s+", 3);
-                    if (setArgs.length == 3) {
-                        setAttribute(setArgs[0], setArgs[1], setArgs[2].replace("\"", ""));
-                    } else {
-                        System.out.println("Грешка: Невалиден формат. Използвайте: set <id> <key> <value>");
-                    }
+                    if (setArgs.length == 3) setAttribute(setArgs[0], setArgs[1], setArgs[2].replace("\"", ""));
+                    else System.out.println("Грешка: Невалиден формат. Използвайте: set <id> <key> <value>");
                     break;
                 case "delete":
                     String[] delArgs = argsStr.split("\\s+");
-                    if (delArgs.length == 2) {
-                        deleteAttribute(delArgs[0], delArgs[1]);
+                    if (delArgs.length == 2) deleteAttribute(delArgs[0], delArgs[1]);
+                    else System.out.println("Грешка: Невалиден формат. Използвайте: delete <id> <key>");
+                    break;
+                case "children":
+                    if (!argsStr.isEmpty()) printChildrenAttributes(argsStr);
+                    else System.out.println("Грешка: Невалиден формат. Използвайте: children <id>");
+                    break;
+                case "child":
+                    String[] childArgs = argsStr.split("\\s+");
+                    if (childArgs.length == 2) {
+                        try {
+                            int index = Integer.parseInt(childArgs[1]);
+                            printNthChild(childArgs[0], index);
+                        } catch (NumberFormatException e) {
+                            System.out.println("Грешка: <n> трябва да бъде цяло число.");
+                        }
                     } else {
-                        System.out.println("Грешка: Невалиден формат. Използвайте: delete <id> <key>");
+                        System.out.println("Грешка: Невалиден формат. Използвайте: child <id> <n>");
                     }
+                    break;
+                case "newchild":
+                    if (!argsStr.isEmpty()) addNewChild(argsStr);
+                    else System.out.println("Грешка: Невалиден формат. Използвайте: newchild <id>");
                     break;
                 case "help":
                     printHelp();
@@ -206,6 +221,77 @@ public class Main {
         } else System.out.println("Грешка: Елемент с ID '" + id + "' не съществува.");
     }
 
+    private static void printChildrenAttributes(String id) {
+        if (rootNode == null) { System.out.println("Грешка: Няма зареден файл."); return; }
+        XmlElement target = findNodeById(rootNode, id);
+        if (target != null) {
+            if (target.getChildren().isEmpty()) { System.out.println("Елементът с ID '" + id + "' няма вложени наследници."); return; }
+            System.out.println("Атрибути на наследниците на елемент '" + id + "':");
+            for (XmlElement child : target.getChildren()) {
+                System.out.print("Дете <" + child.getTagName() + "> (ID: " + child.getId() + ") -> ");
+                if (child.getAttributes().isEmpty()) System.out.println("Няма допълнителни атрибути.");
+                else {
+                    for (Map.Entry<String, String> entry : child.getAttributes().entrySet()) { System.out.print(entry.getKey() + "=\"" + entry.getValue() + "\" "); }
+                    System.out.println();
+                }
+            }
+        } else System.out.println("Грешка: Елемент с ID '" + id + "' не съществува.");
+    }
+
+    private static void printNthChild(String id, int n) {
+        if (rootNode == null) { System.out.println("Грешка: Няма зареден файл."); return; }
+        XmlElement target = findNodeById(rootNode, id);
+        if (target != null) {
+            int childrenCount = target.getChildren().size();
+            if (n >= 0 && n < childrenCount) {
+                System.out.println("Показване на дете " + n + " за елемент '" + id + "':");
+                printNode(target.getChildren().get(n), 0);
+            } else System.out.println("Грешка: Невалиден индекс.");
+        } else System.out.println("Грешка: Елемент с ID '" + id + "' не съществува.");
+    }
+
+    private static void setAttribute(String id, String key, String value) {
+        if (rootNode == null) { System.out.println("Грешка: Няма зареден файл."); return; }
+        XmlElement target = findNodeById(rootNode, id);
+        if (target != null) {
+            if (key.equals("id")) System.out.println("Грешка: Промяната на 'id' е забранена.");
+            else {
+                target.getAttributes().put(key, value);
+                System.out.println("Успех: Атрибутът беше зададен.");
+            }
+        } else System.out.println("Грешка: Елемент с ID '" + id + "' не съществува.");
+    }
+
+    private static void deleteAttribute(String id, String key) {
+        if (rootNode == null) { System.out.println("Грешка: Няма зареден файл."); return; }
+        XmlElement target = findNodeById(rootNode, id);
+        if (target != null) {
+            if (key.equals("id")) System.out.println("Грешка: 'id' не може да се трие.");
+            else if (target.getAttributes().containsKey(key)) {
+                target.getAttributes().remove(key);
+                System.out.println("Успех: Атрибутът беше изтрит.");
+            } else System.out.println("Грешка: Атрибутът не съществува.");
+        } else System.out.println("Грешка: Елемент с ID '" + id + "' не съществува.");
+    }
+    private static void addNewChild(String id) {
+        if (rootNode == null) {
+            System.out.println("Грешка: Няма зареден файл.");
+            return;
+        }
+
+        XmlElement parent = findNodeById(rootNode, id);
+        if (parent != null) {
+            XmlElement newChild = new XmlElement("newElement");
+            String generatedId = "id_" + java.util.UUID.randomUUID().toString().substring(0, 6);
+            newChild.setId(generatedId);
+            parent.addChild(newChild);
+
+            System.out.println("Успех: Добавен е нов празен наследник с ID '" + generatedId + "' към елемент '" + id + "'.");
+        } else {
+            System.out.println("Грешка: Елемент с ID '" + id + "' не съществува.");
+        }
+    }
+
     private static void printHelp() {
         System.out.println("Поддържани команди:");
         System.out.println("open <file>      - отваря <file>");
@@ -217,46 +303,10 @@ public class Main {
         System.out.println("text <id>        - извежда текста на даден елемент");
         System.out.println("set <id> <k> <v> - задава стойност на атрибут");
         System.out.println("delete <id> <k>  - изтрива атрибут");
+        System.out.println("children <id>    - извежда атрибутите на вложените елементи");
+        System.out.println("child <id> <n>   - показва n-тия наследник на елемента");
+        System.out.println("newchild <id>    - добавя празен наследник с ново ID");
         System.out.println("help             - показва това меню");
         System.out.println("exit             - спира програмата");
-    }
-    private static void setAttribute(String id, String key, String value) {
-        if (rootNode == null) {
-            System.out.println("Грешка: Няма зареден файл.");
-            return;
-        }
-
-        XmlElement target = findNodeById(rootNode, id);
-        if (target != null) {
-            if (key.equals("id")) {
-                System.out.println("Грешка: Промяната на атрибута 'id' е забранена, за да не се наруши уникалността в структурата.");
-            } else {
-                target.getAttributes().put(key, value);
-                System.out.println("Успех: Атрибутът '" + key + "' беше зададен на '" + value + "' за елемент с ID '" + id + "'.");
-            }
-        } else {
-            System.out.println("Грешка: Елемент с ID '" + id + "' не съществува.");
-        }
-    }
-
-    private static void deleteAttribute(String id, String key) {
-        if (rootNode == null) {
-            System.out.println("Грешка: Няма зареден файл.");
-            return;
-        }
-
-        XmlElement target = findNodeById(rootNode, id);
-        if (target != null) {
-            if (key.equals("id")) {
-                System.out.println("Грешка: Не можете да изтриете системния атрибут 'id'.");
-            } else if (target.getAttributes().containsKey(key)) {
-                target.getAttributes().remove(key);
-                System.out.println("Успех: Атрибутът '" + key + "' беше изтрит от елемент с ID '" + id + "'.");
-            } else {
-                System.out.println("Грешка: Атрибутът '" + key + "' не съществува в този елемент.");
-            }
-        } else {
-            System.out.println("Грешка: Елемент с ID '" + id + "' не съществува.");
-        }
     }
 }
