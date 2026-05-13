@@ -3,6 +3,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Класът XmlElement представлява един възел (tag) в XML дървото.
+ * Съхранява името на тага, неговото уникално ID, атрибути, текстово съдържание
+ * и списък от вложени елементи (деца).
+ */
 public class XmlElement {
     private String tagName;
     private String id;
@@ -10,6 +15,12 @@ public class XmlElement {
     private List<XmlElement> children;
     private String textContent;
 
+    /**
+     * Конструктор за нов XML елемент.
+     * Инициализира празни колекции за атрибути и деца.
+     *
+     * @param tagName Името на XML тага.
+     */
     public XmlElement(String tagName) {
         this.tagName = tagName;
         this.attributes = new HashMap<>();
@@ -17,39 +28,59 @@ public class XmlElement {
         this.textContent = "";
     }
 
-    public String getTagName() {
-        return tagName;
-    }
+    /**
+     * Връща името на тага.
+     * @return Името на тага.
+     */
+    public String getTagName() { return tagName; }
 
-    public String getId() {
-        return id;
-    }
+    /**
+     * Връща уникалния идентификатор на елемента.
+     * @return Уникалният идентификатор.
+     */
+    public String getId() { return id; }
 
-    public void setId(String id) {
-        this.id = id;
-    }
+    /**
+     * Задава нов идентификатор на елемента.
+     * @param id Новият идентификатор.
+     */
+    public void setId(String id) { this.id = id; }
 
-    public Map<String, String> getAttributes() {
-        return attributes;
-    }
+    /**
+     * Връща речник с атрибутите на елемента (ключ-стойност).
+     * @return Map съдържащ атрибутите.
+     */
+    public Map<String, String> getAttributes() { return attributes; }
 
-    public void addAttribute(String key, String value) {
-        this.attributes.put(key, value);
-    }
+    /**
+     * Добавя или променя атрибут на елемента.
+     *
+     * @param key   Име на атрибута.
+     * @param value Стойност на атрибута.
+     */
+    public void addAttribute(String key, String value) { this.attributes.put(key, value); }
 
-    public List<XmlElement> getChildren() {
-        return children;
-    }
+    /**
+     * Връща списък с вложените наследници на този елемент.
+     * @return Списък от деца (XmlElement).
+     */
+    public List<XmlElement> getChildren() { return children; }
 
-    public void addChild(XmlElement child) {
-        this.children.add(child);
-    }
+    /**
+     * Добавя нов наследник към този елемент.
+     * @param child Обект от тип XmlElement.
+     */
+    public void addChild(XmlElement child) { this.children.add(child); }
 
-    public String getTextContent() {
-        return textContent;
-    }
+    /**
+     * Връща текстовото съдържание на елемента.
+     * @return Текстът между таговете.
+     */
+    public String getTextContent() { return textContent; }
 
-    public void setTextContent(String textContent) {
-        this.textContent = textContent;
-    }
+    /**
+     * Задава ново текстово съдържание на елемента.
+     * @param textContent Новият текст.
+     */
+    public void setTextContent(String textContent) { this.textContent = textContent; }
 }

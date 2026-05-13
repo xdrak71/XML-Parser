@@ -5,10 +5,26 @@ import java.util.Map;
 import java.util.List;
 import java.util.ArrayList;
 
+/**
+ * Главният клас на приложението.
+ * Реализира конзолен интерфейс (CLI) за управление на XML парсера,
+ * управление на файлове и изпълнение на потребителски команди.
+ */
 public class Main {
     private static String activeFilePath = null;
     private static XmlElement rootNode = null;
 
+    /**
+     * Конструктор по подразбиране.
+     */
+    public Main() {
+    }
+
+    /**
+     * Входна точка на програмата. Поддържа безкраен цикъл за четене на команди от конзолата.
+     *
+     * @param args Аргументи от командния ред (не се използват в тази програма).
+     */
     public static void main(String[] args) {
         Scanner sc = new Scanner(System.in);
         System.out.println("XML Парсерът е стартиран. Напишете 'help' за списък с команди.");
@@ -162,6 +178,9 @@ public class Main {
         }
     }
 
+    /**
+     * Рекурсивен метод за записване на XML структурата обратно във файл.
+     */
     private static void writeNodeToFile(PrintWriter writer, XmlElement node, int depth) {
         if (node == null) return;
         StringBuilder spaces = new StringBuilder();
@@ -180,6 +199,13 @@ public class Main {
             for (XmlElement child : node.getChildren()) { writeNodeToFile(writer, child, depth + 1); }
             writer.println(spaces.toString() + "</" + node.getTagName() + ">");
         }
+    }
+    /**
+     * Рекурсивен метод за "красиво" отпечатване (pretty-print) на XML структурата.
+     * Добавя интервали спрямо дълбочината на влагане.
+     * @param node  Текущият възел за отпечатване.
+     * @param depth Текущото ниво на вложеност (започва от 0).
+     */
     private static void printNode(XmlElement node, int depth) {
         if (node == null) return;
         StringBuilder spaces = new StringBuilder();
@@ -200,6 +226,9 @@ public class Main {
         }
     }
 
+    /**
+     * Търси XML елемент по неговия уникален идентификатор.
+     */
     private static XmlElement findNodeById(XmlElement currentNode, String targetId) {
         if (currentNode == null) return null;
         if (targetId.equals(currentNode.getId())) return currentNode;
@@ -293,6 +322,14 @@ public class Main {
             parent.addChild(newChild);
             System.out.println("Успех: Добавен е нов празен наследник с ID '" + generatedId + "'.");
         } else System.out.println("Грешка: Елемент с ID '" + id + "' не съществува.");
+    }
+
+    /**
+     * Изпълнява опростена XPath заявка върху зареденото XML дърво.
+     * Поддържа филтриране по път (/), индекс ([n]), атрибут (@) и под-елемент.
+     * @param id    ID на елемента, от който започва търсенето.
+     * @param query XPath низът на заявката.
+     */
     private static void executeXPath(String id, String query) {
         if (rootNode == null) {
             System.out.println("Грешка: Няма зареден файл.");
@@ -304,6 +341,7 @@ public class Main {
             System.out.println("Грешка: Елемент с ID '" + id + "' не съществува.");
             return;
         }
+
         List<XmlElement> currentNodes = new ArrayList<>();
         currentNodes.add(startNode);
         String[] steps = query.split("/");
@@ -313,6 +351,7 @@ public class Main {
 
         for (String step : steps) {
             List<XmlElement> nextNodes = new ArrayList<>();
+
             if (step.startsWith("(@") && step.endsWith(")")) {
                 String attrName = step.substring(2, step.length() - 1);
                 for (XmlElement el : currentNodes) {
@@ -325,6 +364,7 @@ public class Main {
                 returnsStrings = true;
                 break;
             }
+
             int targetIndex = -1;
             if (step.contains("[") && step.endsWith("]")) {
                 int bracketPos = step.indexOf("[");
@@ -333,6 +373,7 @@ public class Main {
                 } catch (Exception ignored) {}
                 step = step.substring(0, bracketPos);
             }
+
             String filterChildName = null;
             String filterValue = null;
             if (step.contains("(") && step.endsWith(")")) {
@@ -347,6 +388,7 @@ public class Main {
             }
 
             String targetTagName = step;
+
             for (XmlElement el : currentNodes) {
                 List<XmlElement> matchedChildren = new ArrayList<>();
                 for (XmlElement child : el.getChildren()) {
@@ -368,6 +410,7 @@ public class Main {
                         }
                     }
                 }
+
                 if (targetIndex != -1) {
                     if (targetIndex >= 0 && targetIndex < matchedChildren.size()) {
                         nextNodes.add(matchedChildren.get(targetIndex));
@@ -376,9 +419,9 @@ public class Main {
                     nextNodes.addAll(matchedChildren);
                 }
             }
-
             currentNodes = nextNodes;
         }
+
         System.out.println("Резултати от XPath заявката:");
         if (returnsStrings) {
             for (String s : stringResults) {
