@@ -2,6 +2,8 @@ import java.util.Scanner;
 import java.io.File;
 import java.io.PrintWriter;
 import java.util.Map;
+import java.util.List;
+import java.util.ArrayList;
 
 public class Main {
     private static String activeFilePath = null;
@@ -84,6 +86,14 @@ public class Main {
                 case "newchild":
                     if (!argsStr.isEmpty()) addNewChild(argsStr);
                     else System.out.println("Грешка: Невалиден формат. Използвайте: newchild <id>");
+                    break;
+                case "xpath":
+                    String[] xpathArgs = argsStr.split("\\s+", 2);
+                    if (xpathArgs.length == 2) {
+                        executeXPath(xpathArgs[0], xpathArgs[1]);
+                    } else {
+                        System.out.println("Грешка: Невалиден формат. Използвайте: xpath <id> <заявка>");
+                    }
                     break;
                 case "help":
                     printHelp();
@@ -170,7 +180,6 @@ public class Main {
             for (XmlElement child : node.getChildren()) { writeNodeToFile(writer, child, depth + 1); }
             writer.println(spaces.toString() + "</" + node.getTagName() + ">");
         }
-    }
     private static void printNode(XmlElement node, int depth) {
         if (node == null) return;
         StringBuilder spaces = new StringBuilder();
@@ -273,22 +282,114 @@ public class Main {
             } else System.out.println("Грешка: Атрибутът не съществува.");
         } else System.out.println("Грешка: Елемент с ID '" + id + "' не съществува.");
     }
-    private static void addNewChild(String id) {
-        if (rootNode == null) {
-            System.out.println("Грешка: Няма зареден файл.");
-            return;
-        }
 
+    private static void addNewChild(String id) {
+        if (rootNode == null) { System.out.println("Грешка: Няма зареден файл."); return; }
         XmlElement parent = findNodeById(rootNode, id);
         if (parent != null) {
             XmlElement newChild = new XmlElement("newElement");
             String generatedId = "id_" + java.util.UUID.randomUUID().toString().substring(0, 6);
             newChild.setId(generatedId);
             parent.addChild(newChild);
+            System.out.println("Успех: Добавен е нов празен наследник с ID '" + generatedId + "'.");
+        } else System.out.println("Грешка: Елемент с ID '" + id + "' не съществува.");
+    private static void executeXPath(String id, String query) {
+        if (rootNode == null) {
+            System.out.println("Грешка: Няма зареден файл.");
+            return;
+        }
 
-            System.out.println("Успех: Добавен е нов празен наследник с ID '" + generatedId + "' към елемент '" + id + "'.");
-        } else {
+        XmlElement startNode = findNodeById(rootNode, id);
+        if (startNode == null) {
             System.out.println("Грешка: Елемент с ID '" + id + "' не съществува.");
+            return;
+        }
+        List<XmlElement> currentNodes = new ArrayList<>();
+        currentNodes.add(startNode);
+        String[] steps = query.split("/");
+
+        List<String> stringResults = new ArrayList<>();
+        boolean returnsStrings = false;
+
+        for (String step : steps) {
+            List<XmlElement> nextNodes = new ArrayList<>();
+            if (step.startsWith("(@") && step.endsWith(")")) {
+                String attrName = step.substring(2, step.length() - 1);
+                for (XmlElement el : currentNodes) {
+                    if (attrName.equals("id")) {
+                        stringResults.add(el.getId());
+                    } else if (el.getAttributes().containsKey(attrName)) {
+                        stringResults.add(el.getAttributes().get(attrName));
+                    }
+                }
+                returnsStrings = true;
+                break;
+            }
+            int targetIndex = -1;
+            if (step.contains("[") && step.endsWith("]")) {
+                int bracketPos = step.indexOf("[");
+                try {
+                    targetIndex = Integer.parseInt(step.substring(bracketPos + 1, step.length() - 1));
+                } catch (Exception ignored) {}
+                step = step.substring(0, bracketPos);
+            }
+            String filterChildName = null;
+            String filterValue = null;
+            if (step.contains("(") && step.endsWith(")")) {
+                int parenPos = step.indexOf("(");
+                String condition = step.substring(parenPos + 1, step.length() - 1);
+                String[] parts = condition.split("=");
+                if (parts.length == 2) {
+                    filterChildName = parts[0];
+                    filterValue = parts[1].replace("\"", "");
+                }
+                step = step.substring(0, parenPos);
+            }
+
+            String targetTagName = step;
+            for (XmlElement el : currentNodes) {
+                List<XmlElement> matchedChildren = new ArrayList<>();
+                for (XmlElement child : el.getChildren()) {
+                    if (child.getTagName().equals(targetTagName)) {
+                        if (filterChildName != null) {
+                            boolean passedFilter = false;
+                            for (XmlElement grandChild : child.getChildren()) {
+                                if (grandChild.getTagName().equals(filterChildName) &&
+                                        grandChild.getTextContent().equals(filterValue)) {
+                                    passedFilter = true;
+                                    break;
+                                }
+                            }
+                            if (passedFilter) {
+                                matchedChildren.add(child);
+                            }
+                        } else {
+                            matchedChildren.add(child);
+                        }
+                    }
+                }
+                if (targetIndex != -1) {
+                    if (targetIndex >= 0 && targetIndex < matchedChildren.size()) {
+                        nextNodes.add(matchedChildren.get(targetIndex));
+                    }
+                } else {
+                    nextNodes.addAll(matchedChildren);
+                }
+            }
+
+            currentNodes = nextNodes;
+        }
+        System.out.println("Резултати от XPath заявката:");
+        if (returnsStrings) {
+            for (String s : stringResults) {
+                System.out.println("- " + s);
+            }
+            if (stringResults.isEmpty()) System.out.println("Не са намерени съвпадащи атрибути.");
+        } else {
+            for (XmlElement el : currentNodes) {
+                printNode(el, 0);
+            }
+            if (currentNodes.isEmpty()) System.out.println("Не са намерени съвпадащи елементи.");
         }
     }
 
@@ -306,6 +407,7 @@ public class Main {
         System.out.println("children <id>    - извежда атрибутите на вложените елементи");
         System.out.println("child <id> <n>   - показва n-тия наследник на елемента");
         System.out.println("newchild <id>    - добавя празен наследник с ново ID");
+        System.out.println("xpath <id> <q>   - изпълнява XPath заявка (напр. xpath 0 person/address[0])");
         System.out.println("help             - показва това меню");
         System.out.println("exit             - спира програмата");
     }
