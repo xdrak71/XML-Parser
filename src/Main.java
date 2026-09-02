@@ -2,173 +2,199 @@ import java.util.Scanner;
 import java.io.File;
 import java.io.PrintWriter;
 import java.util.Map;
+import java.util.HashMap;
 import java.util.List;
 import java.util.ArrayList;
-
-/**
- * Главният клас на приложението.
- * Реализира конзолен интерфейс (CLI) за управление на XML парсера,
- * управление на файлове и изпълнение на потребителски команди.
- */
 public class Main {
     private static String activeFilePath = null;
     private static XmlElement rootNode = null;
 
-    /**
-     * Конструктор по подразбиране.
-     */
-    public Main() {
+    private static final Map<String, Command> commands = new HashMap<>();
+    public interface Command {
+        void execute(String args);
+    }
+    public static class OpenCommand implements Command {
+        @Override
+        public void execute(String args) {
+            if (args.isEmpty()) {
+                System.out.println("Грешка: Моля, въведете път до файла.");
+                return;
+            }
+            String path = args.replace("\"", "");
+            try {
+                File file = new File(path);
+                if (file.exists()) {
+                    CustomXmlParser parser = new CustomXmlParser();
+                    rootNode = parser.parseFile(path);
+                    activeFilePath = path;
+                    System.out.println("Успешно отворен и прочетен файл " + path);
+                } else {
+                    activeFilePath = path;
+                    rootNode = new XmlElement("root");
+                    rootNode.setId("0");
+                    System.out.println("Файлът не беше намерен. Създаден е нов празен документ в паметта.");
+                }
+            } catch (Exception e) {
+                System.out.println("Грешка при отваряне: " + e.getMessage());
+            }
+        }
     }
 
-    /**
-     * Входна точка на програмата. Поддържа безкраен цикъл за четене на команди от конзолата.
-     *
-     * @param args Аргументи от командния ред (не се използват в тази програма).
-     */
+    public static class CloseCommand implements Command {
+        @Override
+        public void execute(String args) {
+            if (activeFilePath != null) {
+                System.out.println("Успешно затворен файл " + activeFilePath);
+                activeFilePath = null;
+                rootNode = null;
+            } else {
+                System.out.println("Грешка: В момента няма отворен файл.");
+            }
+        }
+    }
+
+    public static class SaveCommand implements Command {
+        @Override
+        public void execute(String args) {
+            if (args.toLowerCase().startsWith("as ")) {
+                String newPath = args.substring(3).trim().replace("\"", "");
+                if (rootNode == null) {
+                    System.out.println("Грешка: Няма отворен файл в паметта.");
+                    return;
+                }
+                performSave(newPath);
+                activeFilePath = newPath;
+            } else if (args.isEmpty()) {
+                if (rootNode == null || activeFilePath == null) {
+                    System.out.println("Грешка: Няма отворен файл, който да бъде запазен.");
+                    return;
+                }
+                performSave(activeFilePath);
+            } else {
+                System.out.println("Невалидна команда. Може би имахте предвид 'save as'?");
+            }
+        }
+    }
+
+    public static class PrintCommand implements Command {
+        @Override
+        public void execute(String args) {
+            if (rootNode != null) printNode(rootNode, 0);
+            else System.out.println("Грешка: Няма зареден файл в паметта.");
+        }
+    }
+
+    public static class HelpCommand implements Command {
+        @Override
+        public void execute(String args) {
+            System.out.println("Поддържани команди: open, close, save, save as, print, select, text, set, delete, children, child, newchild, xpath, help, exit");
+        }
+    }
+    private static void initializeCommands() {
+        commands.put("open", new OpenCommand());
+        commands.put("close", new CloseCommand());
+        commands.put("save", new SaveCommand());
+        commands.put("print", new PrintCommand());
+        commands.put("help", new HelpCommand());
+        commands.put("select", new Command() {
+            public void execute(String args) {
+                String[] selArgs = args.split("\\s+");
+                if (selArgs.length >= 2) selectAttribute(selArgs[0], selArgs[1]);
+                else System.out.println("Грешка: Използвайте: select <id> <key>");
+            }
+        });
+
+        commands.put("text", new Command() {
+            public void execute(String args) {
+                if (!args.isEmpty()) printNodeText(args);
+                else System.out.println("Грешка: Използвайте: text <id>");
+            }
+        });
+
+        commands.put("set", new Command() {
+            public void execute(String args) {
+                String[] setArgs = args.split("\\s+", 3);
+                if (setArgs.length == 3) setAttribute(setArgs[0], setArgs[1], setArgs[2].replace("\"", ""));
+                else System.out.println("Грешка: Използвайте: set <id> <key> <value>");
+            }
+        });
+
+        commands.put("delete", new Command() {
+            public void execute(String args) {
+                String[] delArgs = args.split("\\s+");
+                if (delArgs.length >= 2) deleteAttribute(delArgs[0], delArgs[1]);
+                else System.out.println("Грешка: Използвайте: delete <id> <key>");
+            }
+        });
+
+        commands.put("children", new Command() {
+            public void execute(String args) {
+                if (!args.isEmpty()) printChildrenAttributes(args);
+                else System.out.println("Грешка: Използвайте: children <id>");
+            }
+        });
+
+        commands.put("child", new Command() {
+            public void execute(String args) {
+                String[] childArgs = args.split("\\s+");
+                if (childArgs.length >= 2) {
+                    try {
+                        int index = Integer.parseInt(childArgs[1]);
+                        printNthChild(childArgs[0], index);
+                    } catch (NumberFormatException e) {
+                        System.out.println("Грешка: <n> трябва да бъде цяло число.");
+                    }
+                } else System.out.println("Грешка: Използвайте: child <id> <n>");
+            }
+        });
+
+        commands.put("newchild", new Command() {
+            public void execute(String args) {
+                if (!args.isEmpty()) addNewChild(args);
+                else System.out.println("Грешка: Използвайте: newchild <id>");
+            }
+        });
+
+        commands.put("xpath", new Command() {
+            public void execute(String args) {
+                String[] xpathArgs = args.split("\\s+", 2);
+                if (xpathArgs.length == 2) executeXPath(xpathArgs[0], xpathArgs[1]);
+                else System.out.println("Грешка: Използвайте: xpath <id> <заявка>");
+            }
+        });
+    }
+
     public static void main(String[] args) {
+        initializeCommands();
         Scanner sc = new Scanner(System.in);
-        System.out.println("XML Парсерът е стартиран. Напишете 'help' за списък с команди.");
+        System.out.println("XML Парсерът е стартиран. Напишете 'help' за команди.");
 
         while (true) {
             System.out.print("> ");
             String inputLine = sc.nextLine().trim();
-
-            if (inputLine.isEmpty()) {
-                continue;
-            }
+            if (inputLine.isEmpty()) continue;
 
             String[] words = inputLine.split("\\s+", 2);
-            String cmd = words[0].toLowerCase();
+            String cmdName = words[0].toLowerCase();
             String argsStr = words.length > 1 ? words[1].trim() : "";
 
-            switch (cmd) {
-                case "open":
-                    if (!argsStr.isEmpty()) openFile(argsStr.replace("\"", ""));
-                    else System.out.println("Грешка: Моля, въведете път до файла.");
-                    break;
-                case "close":
-                    closeFile();
-                    break;
-                case "save":
-                    if (argsStr.toLowerCase().startsWith("as ")) {
-                        String newPath = argsStr.substring(3).trim().replace("\"", "");
-                        saveFileAs(newPath);
-                    } else if (argsStr.isEmpty()) {
-                        saveFile();
-                    } else {
-                        System.out.println("Невалидна команда. Може би имахте предвид 'save as'?");
-                    }
-                    break;
-                case "print":
-                    if (rootNode != null) printNode(rootNode, 0);
-                    else System.out.println("Грешка: Няма зареден файл в паметта.");
-                    break;
-                case "select":
-                    String[] selArgs = argsStr.split("\\s+");
-                    if (selArgs.length == 2) selectAttribute(selArgs[0], selArgs[1]);
-                    else System.out.println("Грешка: Невалиден формат. Използвайте: select <id> <key>");
-                    break;
-                case "text":
-                    if (!argsStr.isEmpty()) printNodeText(argsStr);
-                    else System.out.println("Грешка: Невалиден формат. Използвайте: text <id>");
-                    break;
-                case "set":
-                    String[] setArgs = argsStr.split("\\s+", 3);
-                    if (setArgs.length == 3) setAttribute(setArgs[0], setArgs[1], setArgs[2].replace("\"", ""));
-                    else System.out.println("Грешка: Невалиден формат. Използвайте: set <id> <key> <value>");
-                    break;
-                case "delete":
-                    String[] delArgs = argsStr.split("\\s+");
-                    if (delArgs.length == 2) deleteAttribute(delArgs[0], delArgs[1]);
-                    else System.out.println("Грешка: Невалиден формат. Използвайте: delete <id> <key>");
-                    break;
-                case "children":
-                    if (!argsStr.isEmpty()) printChildrenAttributes(argsStr);
-                    else System.out.println("Грешка: Невалиден формат. Използвайте: children <id>");
-                    break;
-                case "child":
-                    String[] childArgs = argsStr.split("\\s+");
-                    if (childArgs.length == 2) {
-                        try {
-                            int index = Integer.parseInt(childArgs[1]);
-                            printNthChild(childArgs[0], index);
-                        } catch (NumberFormatException e) {
-                            System.out.println("Грешка: <n> трябва да бъде цяло число.");
-                        }
-                    } else {
-                        System.out.println("Грешка: Невалиден формат. Използвайте: child <id> <n>");
-                    }
-                    break;
-                case "newchild":
-                    if (!argsStr.isEmpty()) addNewChild(argsStr);
-                    else System.out.println("Грешка: Невалиден формат. Използвайте: newchild <id>");
-                    break;
-                case "xpath":
-                    String[] xpathArgs = argsStr.split("\\s+", 2);
-                    if (xpathArgs.length == 2) {
-                        executeXPath(xpathArgs[0], xpathArgs[1]);
-                    } else {
-                        System.out.println("Грешка: Невалиден формат. Използвайте: xpath <id> <заявка>");
-                    }
-                    break;
-                case "help":
-                    printHelp();
-                    break;
-                case "exit":
-                    System.out.println("Излизане от програмата...");
-                    sc.close();
-                    return;
-                default:
-                    System.out.println("Невалидна команда. Напишете 'help'.");
+            if (cmdName.equals("exit")) {
+                System.out.println("Излизане от програмата...");
+                sc.close();
+                return;
             }
-        }
-    }
-    private static void openFile(String path) {
-        try {
-            File file = new File(path);
-            if (file.exists()) {
-                CustomXmlParser parser = new CustomXmlParser();
-                rootNode = parser.parseFile(path);
-                activeFilePath = path;
-                System.out.println("Успешно отворен и прочетен файл " + path);
+            Command command = commands.get(cmdName);
+            if (command != null) {
+                try {
+                    command.execute(argsStr);
+                } catch (Exception e) {
+                    System.out.println("Възникна грешка при изпълнение на командата: " + e.getMessage());
+                }
             } else {
-                activeFilePath = path;
-                rootNode = new XmlElement("root");
-                rootNode.setId("0");
-                System.out.println("Файлът не беше намерен. Създаден е нов празен документ в паметта.");
+                System.out.println("Невалидна команда. Напишете 'help'.");
             }
-        } catch (Exception e) {
-            System.out.println("Възникна грешка при отварянето или четенето на файла: " + e.getMessage());
         }
     }
-
-    private static void closeFile() {
-        if (activeFilePath != null) {
-            System.out.println("Успешно затворен файл " + activeFilePath);
-            activeFilePath = null;
-            rootNode = null;
-        } else {
-            System.out.println("Грешка: В момента няма отворен файл, който да бъде затворен.");
-        }
-    }
-
-    private static void saveFile() {
-        if (rootNode == null || activeFilePath == null) {
-            System.out.println("Грешка: Няма отворен файл, който да бъде запазен.");
-            return;
-        }
-        performSave(activeFilePath);
-    }
-
-    private static void saveFileAs(String newPath) {
-        if (rootNode == null) {
-            System.out.println("Грешка: Няма отворен файл в паметта.");
-            return;
-        }
-        performSave(newPath);
-        activeFilePath = newPath;
-    }
-
     private static void performSave(String path) {
         try (PrintWriter writer = new PrintWriter(path)) {
             writeNodeToFile(writer, rootNode, 0);
@@ -178,9 +204,6 @@ public class Main {
         }
     }
 
-    /**
-     * Рекурсивен метод за записване на XML структурата обратно във файл.
-     */
     private static void writeNodeToFile(PrintWriter writer, XmlElement node, int depth) {
         if (node == null) return;
         StringBuilder spaces = new StringBuilder();
@@ -200,12 +223,7 @@ public class Main {
             writer.println(spaces.toString() + "</" + node.getTagName() + ">");
         }
     }
-    /**
-     * Рекурсивен метод за "красиво" отпечатване (pretty-print) на XML структурата.
-     * Добавя интервали спрямо дълбочината на влагане.
-     * @param node  Текущият възел за отпечатване.
-     * @param depth Текущото ниво на вложеност (започва от 0).
-     */
+
     private static void printNode(XmlElement node, int depth) {
         if (node == null) return;
         StringBuilder spaces = new StringBuilder();
@@ -226,9 +244,6 @@ public class Main {
         }
     }
 
-    /**
-     * Търси XML елемент по неговия уникален идентификатор.
-     */
     private static XmlElement findNodeById(XmlElement currentNode, String targetId) {
         if (currentNode == null) return null;
         if (targetId.equals(currentNode.getId())) return currentNode;
@@ -324,12 +339,6 @@ public class Main {
         } else System.out.println("Грешка: Елемент с ID '" + id + "' не съществува.");
     }
 
-    /**
-     * Изпълнява опростена XPath заявка върху зареденото XML дърво.
-     * Поддържа филтриране по път (/), индекс ([n]), атрибут (@) и под-елемент.
-     * @param id    ID на елемента, от който започва търсенето.
-     * @param query XPath низът на заявката.
-     */
     private static void executeXPath(String id, String query) {
         if (rootNode == null) {
             System.out.println("Грешка: Няма зареден файл.");
@@ -424,34 +433,11 @@ public class Main {
 
         System.out.println("Резултати от XPath заявката:");
         if (returnsStrings) {
-            for (String s : stringResults) {
-                System.out.println("- " + s);
-            }
+            for (String s : stringResults) { System.out.println("- " + s); }
             if (stringResults.isEmpty()) System.out.println("Не са намерени съвпадащи атрибути.");
         } else {
-            for (XmlElement el : currentNodes) {
-                printNode(el, 0);
-            }
+            for (XmlElement el : currentNodes) { printNode(el, 0); }
             if (currentNodes.isEmpty()) System.out.println("Не са намерени съвпадащи елементи.");
         }
-    }
-
-    private static void printHelp() {
-        System.out.println("Поддържани команди:");
-        System.out.println("open <file>      - отваря <file>");
-        System.out.println("close            - затваря текущия файл");
-        System.out.println("save             - записва промените");
-        System.out.println("save as <file>   - записва промените в нов файл");
-        System.out.println("print            - извежда на екрана информацията");
-        System.out.println("select <id> <k>  - извежда стойност на атрибут по ключ");
-        System.out.println("text <id>        - извежда текста на даден елемент");
-        System.out.println("set <id> <k> <v> - задава стойност на атрибут");
-        System.out.println("delete <id> <k>  - изтрива атрибут");
-        System.out.println("children <id>    - извежда атрибутите на вложените елементи");
-        System.out.println("child <id> <n>   - показва n-тия наследник на елемента");
-        System.out.println("newchild <id>    - добавя празен наследник с ново ID");
-        System.out.println("xpath <id> <q>   - изпълнява XPath заявка (напр. xpath 0 person/address[0])");
-        System.out.println("help             - показва това меню");
-        System.out.println("exit             - спира програмата");
     }
 }

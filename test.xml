@@ -1,0 +1,8 @@
+<university id="uni_1" name="Sofia_University">
+    <faculty id="fac_1" type="IT">
+        <student id="st_1" grade="6">Ivan Ivanov</student>
+        <student id="st_1" grade="5">Maria Popova</student>
+        <professor department="Math">Dr. Petrov</professor>
+    </faculty>
+    <location city="Sofia" />
+</university>
